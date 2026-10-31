@@ -196,9 +196,17 @@ var TIPOS=['Mainline','Treasure Hunt','Super Treasure Hunt','Premium','Car Cultu
 var RARIDADES=['Comum','Pouco comum','Rara','Muito rara'];
 var LS_KEY='garagem164:carros';
 
+/* Configuração do Firebase (login Google + banco Firestore) do projeto GaragemDMCar. */
+var FIREBASE_CONFIG={
+  apiKey:'AIzaSyCHu45tyq-GZjZFR2NhP3bR3-2tHKCrKoE',
+  authDomain:'garagemdmcar.firebaseapp.com',
+  projectId:'garagemdmcar',
+  appId:'1:248454824261:web:697712a3cb068e702cbe2c'
+};
+
 var S={
   cars:[],tab:'col',filter:'all',q:'',openId:null,editing:false,confirmDel:false,
-  mode:'pending',imp:null,cfgOpen:false,
+  mode:'pending',imp:null,cfgOpen:false,fb:null,fbReady:false,user:null,unsub:null,cloudReady:false,migDismiss:false,
   ai:null,canImg:false,maxImg:1,web:false,canTools:false,webProp:null,
   add:{phase:'idle',photos:[],hint:'',result:null,values:{},error:'',ctl:null},
   chat:{ctx:'all',turns:[],busy:false,partial:'',err:'',ctl:null}
@@ -244,11 +252,42 @@ async function prepare(file){
   return {aiBlob:aiBlob,thumb:thumb};
 }
 
-/* ---------- armazenamento ---------- */
-function initStore(){ S.mode='local'; S.cars=lsLoad(); sortCars(); renderAll(); }
+/* ---------- armazenamento (aparelho e nuvem) ---------- */
+function initStore(){ S.mode='local'; S.cars=lsLoad(); sortCars(); renderAll(); initFirebase(); }
 function showErr(m){ S.saveErr=m; toast(m); if(S.tab==='add') renderAdd(); }
 function docSize(car){ try{return JSON.stringify(car).length}catch(e){return 0} }
+function tmo(p,ms){
+  return new Promise(function(res,rej){
+    var t=setTimeout(function(){rej({code:'timeout'})},ms);
+    p.then(function(v){clearTimeout(t);res(v)},function(e){clearTimeout(t);rej(e)});
+  });
+}
+function fsMsg(e){
+  var c=e&&e.code;
+  if(c==='permission-denied') return 'Sem permissão no banco. Confira as regras do Firestore.';
+  if(c==='unavailable') return 'Sem conexão com o servidor. Tente de novo.';
+  if(c==='resource-exhausted') return 'Limite do banco de dados atingido por hoje. Tente mais tarde.';
+  if(c==='invalid-argument'||c==='out-of-range') return 'O banco recusou a ficha (provavelmente fotos grandes demais).';
+  return 'Não foi possível salvar na nuvem'+(c?' (código: '+c+')':'')+'. Tente de novo.';
+}
+function authMsg(e){
+  var c=e&&e.code;
+  if(c==='auth/unauthorized-domain') return 'Este endereço não está autorizado no Firebase (Authentication > Configurações > Domínios autorizados).';
+  if(c==='auth/operation-not-allowed') return 'O login com Google não está ativado no Firebase.';
+  if(c==='auth/network-request-failed') return 'Sem conexão. Verifique a internet e tente de novo.';
+  return 'Não consegui entrar com o Google'+(c?' (código: '+c+')':'')+'.';
+}
+function cleanCar(c){ return JSON.parse(JSON.stringify(c)); }
+function cloudDoc(id){ return S.fb.m.doc(S.fb.db,'usuarios',S.user.uid,'carros',id); }
 async function persist(car){
+  if(S.mode==='cloud'){
+    try{ await tmo(S.fb.m.setDoc(cloudDoc(car.id),cleanCar(car)),15000); }
+    catch(e){
+      if(e&&e.code==='timeout'){ toast('Sem conexão: o carrinho será enviado quando a internet voltar.'); return true; }
+      showErr(fsMsg(e)); return false;
+    }
+    return true;
+  }
   var i=S.cars.findIndex(function(c){return c.id===car.id}),prev=i<0?null:S.cars[i];
   if(i<0) S.cars.unshift(car); else S.cars[i]=car;
   sortCars();
@@ -261,7 +300,81 @@ async function persist(car){
   renderCol(); return true;
 }
 async function removeCar(id){
+  if(S.mode==='cloud'){
+    try{ await tmo(S.fb.m.deleteDoc(cloudDoc(id)),15000); }
+    catch(e){
+      if(e&&e.code==='timeout'){ toast('Sem conexão: a exclusão será enviada quando a internet voltar.'); return true; }
+      toast(fsMsg(e)); return false;
+    }
+    return true;
+  }
   S.cars=S.cars.filter(function(c){return c.id!==id}); lsSave(); renderCol(); return true;
+}
+
+/* ---------- login com Google (Firebase) ---------- */
+async function initFirebase(){
+  if(!FIREBASE_CONFIG.apiKey||!FIREBASE_CONFIG.projectId) return;
+  try{
+    var B='https://www.gstatic.com/firebasejs/13.1.0/';
+    var mods=await Promise.all([import(B+'firebase-app.js'),import(B+'firebase-auth.js'),import(B+'firebase-firestore.js')]);
+    var m=Object.assign({},mods[0],mods[1],mods[2]);
+    var app=m.initializeApp(FIREBASE_CONFIG);
+    S.fb={m:m,auth:m.getAuth(app),db:m.getFirestore(app)};
+    S.fbReady=true; renderCol();
+    m.onAuthStateChanged(S.fb.auth,onUser);
+  }catch(e){ toast('Não consegui carregar o login do Google. Usando só este aparelho.'); }
+}
+function onUser(user){
+  if(S.unsub){ S.unsub(); S.unsub=null; }
+  S.user=user||null; S.cloudReady=false; S.migDismiss=false;
+  if(!user){ S.mode='local'; S.cars=lsLoad(); sortCars(); renderAll(); return; }
+  var m=S.fb.m;
+  S.unsub=m.onSnapshot(m.collection(S.fb.db,'usuarios',user.uid,'carros'),function(snap){
+    S.cars=snap.docs.map(function(d){var o=d.data()||{};o.id=d.id;return o});
+    S.mode='cloud'; S.cloudReady=true; sortCars();
+    renderCol(); if(!S.editing) renderSheet(); if(S.tab==='chat'&&!S.chat.busy) renderChat();
+  },function(e){
+    if(S.unsub){ S.unsub(); S.unsub=null; }
+    S.mode='local'; S.cars=lsLoad(); sortCars(); renderAll(); toast(fsMsg(e));
+  });
+}
+async function login(){
+  var F=S.fb; if(!F) return;
+  var p=new F.m.GoogleAuthProvider(); p.setCustomParameters({prompt:'select_account'});
+  try{ await F.m.signInWithPopup(F.auth,p); }
+  catch(e){
+    var c=e&&e.code;
+    if(c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request') return;
+    if(c==='auth/popup-blocked'||c==='auth/operation-not-supported-in-this-environment'){
+      try{ await F.m.signInWithRedirect(F.auth,p); }catch(e2){ toast(authMsg(e2)); }
+      return;
+    }
+    toast(authMsg(e));
+  }
+}
+async function logout(){
+  try{ await S.fb.m.signOut(S.fb.auth); toast('Você saiu da conta.'); }catch(e){ toast('Não consegui sair. Tente de novo.'); }
+}
+function localToSend(){
+  var have={}; S.cars.forEach(function(c){have[c.id]=1});
+  return lsLoad().filter(function(c){return c&&c.id&&typeof c.nome==='string'&&!have[c.id]});
+}
+async function sendLocal(){
+  var list=localToSend();
+  if(!list.length){ S.migDismiss=true; renderBackup(); return; }
+  try{ await tmo(Promise.all(list.map(function(c){return S.fb.m.setDoc(cloudDoc(c.id),cleanCar(c))})),60000); toast(list.length+(list.length===1?' carrinho enviado para a sua conta.':' carrinhos enviados para a sua conta.')); S.migDismiss=true; renderBackup(); }
+  catch(e){ if(e&&e.code==='timeout'){ toast('Sem conexão: o envio será concluído quando a internet voltar.'); S.migDismiss=true; renderBackup(); } else toast(fsMsg(e)); }
+}
+function accountHTML(){
+  if(!S.fbReady) return '';
+  if(!S.user) return '<span class="links-h">Conta</span>'+
+    '<p class="muted" style="font-size:14px">Entre com o Google para guardar sua garagem na nuvem e abri-la em qualquer aparelho.</p>'+
+    '<button class="btn primary" data-act="login">Entrar com Google</button>';
+  var n=S.cloudReady?localToSend().length:0;
+  return '<span class="links-h">Conta</span>'+
+    '<div class="note"><b>Conectado: '+esc(S.user.email||S.user.displayName||'conta Google')+'</b><span>Sua garagem é salva na nuvem, ligada a esta conta.</span></div>'+
+    (n&&!S.migDismiss?'<div class="note"><b>'+n+(n===1?' carrinho está salvo':' carrinhos estão salvos')+' só neste aparelho.</b><button class="btn primary" data-act="mig-yes">Enviar para a minha conta</button><button class="btn ghost" data-act="mig-no">Agora não</button></div>':'')+
+    '<button class="btn ghost" data-act="logout">Sair da conta</button>';
 }
 
 /* ---------- backup em JSON ---------- */
@@ -332,21 +445,36 @@ function importFile(file){
   rd.onerror=function(){ toast('Não consegui ler o arquivo.'); };
   rd.readAsText(file);
 }
-function applyImport(modo){
+async function applyImport(modo){
   var imp=S.imp; if(!imp) return;
   var have={}; S.cars.forEach(function(c){have[c.id]=1});
   var toWrite=modo==='merge'?imp.cars.filter(function(c){return !have[c.id]}):imp.cars;
+  var msg=modo==='replace'?'Coleção restaurada: '+imp.cars.length+' carrinhos.':toWrite.length+(toWrite.length===1?' carrinho adicionado.':' carrinhos adicionados.');
+  if(S.mode==='cloud'){
+    try{
+      var m=S.fb.m,ops=[];
+      if(modo==='replace'){
+        var keep={}; imp.cars.forEach(function(c){keep[c.id]=1});
+        S.cars.filter(function(c){return !keep[c.id]}).forEach(function(c){ops.push(m.deleteDoc(cloudDoc(c.id)))});
+      }
+      toWrite.forEach(function(c){ops.push(m.setDoc(cloudDoc(c.id),cleanCar(c)))});
+      await tmo(Promise.all(ops),60000);
+    }catch(e){
+      if(!(e&&e.code==='timeout')){ toast(fsMsg(e)); return; }
+      msg='Sem conexão: a importação será concluída quando a internet voltar.';
+    }
+    S.imp=null; renderCol(); toast(msg); return;
+  }
   var before=S.cars;
   S.cars=modo==='replace'?imp.cars.slice():S.cars.concat(toWrite);
   sortCars();
   if(!lsSave()){ S.cars=before; renderCol(); toast('Armazenamento cheio: nada foi importado.'); return; }
-  S.imp=null; renderCol();
-  toast(modo==='replace'?'Coleção restaurada: '+imp.cars.length+' carrinhos.':toWrite.length+(toWrite.length===1?' carrinho adicionado.':' carrinhos adicionados.'));
+  S.imp=null; renderCol(); toast(msg);
 }
 function renderBackup(){
   var el=$('#backup'); if(!el) return;
   if(S.mode==='pending'){ el.innerHTML=''; return; }
-  var h='<span class="links-h">Backup</span>'+
+  var h=accountHTML()+'<span class="links-h">Backup</span>'+
     '<p class="muted" style="font-size:14px">Salve uma cópia da coleção (com as fotos) em um arquivo JSON ou restaure a partir dele.</p>'+
     '<div class="row"><button class="btn" data-act="exp"'+(S.cars.length?'':' disabled')+'>Exportar backup (JSON)</button>'+
     '<label class="btn" for="in-json" role="button">Importar backup</label></div>'+
@@ -664,7 +792,7 @@ function renderCol(){
   }).join('')+'</div>'+localNote();
 }
 function localNote(){
-  return S.mode==='local'?'<p class="foot">Sua coleção está salva só neste navegador. Em outro aparelho ela não aparece.</p>':'';
+  return S.mode==='local'?'<p class="foot">Sua coleção está salva só neste navegador. Em outro aparelho ela não aparece.'+(S.fbReady?' Entre com o Google no fim desta aba para guardá-la na nuvem.':'')+'</p>':'';
 }
 
 /* ---------- renderização: detalhe ---------- */
@@ -736,7 +864,7 @@ function renderAdd(){
     if(a.photos.length) h+=strip();
     if(a.error) h+='<p class="err">'+esc(a.error)+'</p>';
     if(S.saveErr) h+='<div class="note"><b class="err">Não salvou</b><span class="err">'+esc(S.saveErr)+'</span></div>';
-    if(S.mode==='local') h+='<div class="note"><b>Salvo só neste aparelho.</b><span>Faça um backup em JSON de vez em quando, no fim da aba Coleção.</span></div>';
+    if(S.mode==='local') h+='<div class="note"><b>Salvo só neste aparelho.</b><span>Entre com o Google no fim da aba Coleção para guardar na nuvem, ou faça um backup em JSON.</span></div>';
     if(r){
       var lbl={alta:'Confiança alta',media:'Confiança média',baixa:'Confiança baixa'}[r.confianca];
       h+='<div class="note"><div><span class="pill '+r.confianca+'">'+lbl+'</span></div>'+
@@ -868,8 +996,12 @@ document.addEventListener('click',async function(e){
     case 'exp': exportBackup(); break;
     case 'copy-json': copyBackup(); break;
     case 'imp-cancel': S.imp=null; renderBackup(); break;
-    case 'imp-merge': t.disabled=true; applyImport('merge'); break;
-    case 'imp-replace': t.disabled=true; applyImport('replace'); break;
+    case 'imp-merge': t.disabled=true; await applyImport('merge'); break;
+    case 'imp-replace': t.disabled=true; await applyImport('replace'); break;
+    case 'login': t.disabled=true; await login(); t.disabled=false; break;
+    case 'logout': await logout(); break;
+    case 'mig-yes': t.disabled=true; await sendLocal(); break;
+    case 'mig-no': S.migDismiss=true; renderBackup(); break;
     case 'cfg': S.cfgOpen=true; renderSheet(); break;
     case 'cfg-close': S.cfgOpen=false; renderSheet(); break;
     case 'cfg-save': await cfgSave(); break;
@@ -906,7 +1038,7 @@ document.addEventListener('click',async function(e){
       while(docSize(car)>235000&&car.fotos.length>1) car.fotos.pop();
       if(docSize(car)>250000){ car.fotos=[]; toast('Fotos grandes demais: salvando sem foto.'); }
       S.saveErr=''; t.disabled=true;
-      if(await persist(car)){ resetAdd(); setTab('col'); toast('Salvo neste aparelho.'); } else { t.disabled=false; renderAdd(); }
+      if(await persist(car)){ resetAdd(); setTab('col'); toast(S.mode==='cloud'?'Salvo na sua conta.':'Salvo neste aparelho.'); } else { t.disabled=false; renderAdd(); }
       break;
     case 'web-add':
       var a2=S.add; a2.values=readForm('a',true)||a2.values;
