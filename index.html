@@ -498,20 +498,42 @@ function gSaveCfg(c){try{localStorage.setItem(G_KEY,JSON.stringify(c));return tr
 function gModel(){var m=gCfg().model;return G_MODELS.some(function(x){return x[0]===m})?m:G_MODELS[0][0]}
 function gKeyOk(k){return typeof k==='string'&&k.length>0&&!/\s/.test(k)}
 function blobB64(b){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result).split(',')[1]||'')};r.onerror=function(){rej({code:'image_rejected'})};r.readAsDataURL(b)})}
+function gPause(ms,signal){return new Promise(function(resolve,reject){if(signal&&signal.aborted){reject({code:'cancelled'});return;}var timer=setTimeout(done,ms);function done(){if(signal)signal.removeEventListener('abort',stop);resolve();}function stop(){clearTimeout(timer);if(signal)signal.removeEventListener('abort',stop);reject({code:'cancelled'});}if(signal)signal.addEventListener('abort',stop,{once:true});});}
+async function gFetch(url,options){
+ for(var attempt=0;attempt<3;attempt++){
+  if(options.signal&&options.signal.aborted)throw {code:'cancelled'};
+  var controller=new AbortController(),timedOut=false;
+  var onAbort=function(){controller.abort();};
+  if(options.signal)options.signal.addEventListener('abort',onAbort,{once:true});
+  var timer=setTimeout(function(){timedOut=true;controller.abort();},45000),response;
+  try{response=await fetch(url,Object.assign({},options,{signal:controller.signal}));}
+  catch(e){if(options.signal&&options.signal.aborted)throw {code:'cancelled'};if(timedOut)throw {code:'ai_timeout'};throw e;}
+  finally{clearTimeout(timer);if(options.signal)options.signal.removeEventListener('abort',onAbort);}
+  if([502,503,504].indexOf(response.status)<0||attempt===2)return response;
+  var ra=response.headers&&response.headers.get('Retry-After'),delay=2000*Math.pow(2,attempt)+Math.floor(Math.random()*500);
+  if(ra){var sec=Number(ra);if(Number.isFinite(sec)&&sec>=0)delay=Math.max(delay,sec*1000);else{var date=Date.parse(ra);if(Number.isFinite(date))delay=Math.max(delay,date-Date.now());}}
+  if(delay>30000)return response;
+  try{if(response.body)await response.body.cancel();}catch(ignore){}
+  toast('Gemini ocupado. Tentando novamente ('+(attempt+2)+'/3)…');await gPause(delay,options.signal);
+ }
+}
+
 async function gCall(body,signal){
   var cfg=gCfg(); if(!gKeyOk(cfg.key)) throw {code:'bad_key'};
   var res;
   try{
-    res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(gModel())+':generateContent?key='+encodeURIComponent(cfg.key),{
+    res=await gFetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(gModel())+':generateContent?key='+encodeURIComponent(cfg.key),{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:signal
     });
   }catch(e){
+    if(e&&(e.code==='cancelled'||e.code==='ai_timeout')) throw e;
     if(e&&e.name==='AbortError') throw {code:'cancelled'};
     throw {code:'network',detail:String(e&&e.message||e)};
   }
   var data=null; try{ data=await res.json(); }catch(e){}
   if(!res.ok){
     var msg=String(data&&data.error&&data.error.message||'');
+    if([502,503,504].indexOf(res.status)>=0) throw {code:'service_busy',status:res.status};
     if(res.status===429) throw {code:'rate_limited'};
     if(res.status===401||res.status===403||(res.status===400&&/api key/i.test(msg))) throw {code:'bad_key',status:res.status,detail:msg};
     throw {code:'upstream_error',status:res.status,detail:msg};
@@ -631,6 +653,8 @@ function idPrompt(n,hint){
 }
 function aiErr(e){
   switch(e&&e.code){
+    case 'service_busy': return 'O Gemini continua ocupado após as tentativas ou pediu uma espera maior. Aguarde um pouco e tente novamente; se persistir, escolha outro modelo em ⚙ IA.';
+    case 'ai_timeout': return 'O Gemini demorou demais para responder. Tente novamente mais tarde.';
     case 'not_granted': return 'O uso da IA não foi permitido. Preencha a ficha à mão.';
     case 'rate_limited': return 'Muitas consultas seguidas. Espere um pouco e tente de novo.';
     case 'invalid_json': case 'empty_completion': return 'A IA não devolveu uma ficha legível. Tente de novo ou preencha à mão.';
@@ -669,7 +693,7 @@ async function identify(fresh){
 /* ---------- pesquisa na internet ---------- */
 function webErr(e){
   switch(e&&e.code){
-    case 'bad_key': case 'network': case 'invalid_json': case 'empty_completion': case 'refused': case 'rate_limited': return aiErr(e);
+    case 'service_busy': case 'ai_timeout': case 'bad_key': case 'network': case 'invalid_json': case 'empty_completion': case 'refused': case 'rate_limited': return aiErr(e);
     case 'cancelled': return '';
     default: return 'A pesquisa na internet não respondeu agora'+(e&&e.status?' (erro '+e.status+')':'')+'. Tente de novo.';
   }
@@ -971,7 +995,7 @@ async function runChat(){
   }catch(e){
     if(e&&e.text) ch.turns.push({role:'assistant',content:e.text+'\n\n(resposta interrompida)'});
     else if(!e||e.code!=='cancelled'){
-      ch.err=e&&(e.code==='bad_key'||e.code==='network')?aiErr(e):e&&e.code==='not_granted'?'O uso da IA não foi permitido.':e&&e.code==='rate_limited'?'Muitas perguntas seguidas. Espere um pouco.':'A IA não respondeu agora'+(e&&e.status?' (erro '+e.status+(e.detail?': '+String(e.detail).slice(0,160):'')+')':'')+'.';
+      ch.err=e&&(e.code==='bad_key'||e.code==='network'||e.code==='service_busy'||e.code==='ai_timeout')?aiErr(e):e&&e.code==='not_granted'?'O uso da IA não foi permitido.':e&&e.code==='rate_limited'?'Muitas perguntas seguidas. Espere um pouco.':'A IA não respondeu agora'+(e&&e.status?' (erro '+e.status+(e.detail?': '+String(e.detail).slice(0,160):'')+')':'')+'.';
     }
   }
   ch.busy=false; ch.partial=''; ch.ctl=null; renderChat(); scrollEnd();
