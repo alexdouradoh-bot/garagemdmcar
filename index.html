@@ -496,7 +496,7 @@ var G_MODELS=[['gemini-3.8-flash','Gemini 3.8 Flash (recomendado)'],['gemini-3.6
 function gCfg(){try{return JSON.parse(localStorage.getItem(G_KEY)||'{}')||{}}catch(e){return {}}}
 function gSaveCfg(c){try{localStorage.setItem(G_KEY,JSON.stringify(c));return true}catch(e){return false}}
 function gModel(){var m=gCfg().model;return G_MODELS.some(function(x){return x[0]===m})?m:G_MODELS[0][0]}
-function gKeyOk(k){return typeof k==='string'&&/^[A-Za-z0-9_\-]{20,}$/.test(k)}
+function gKeyOk(k){return typeof k==='string'&&k.length>0&&!/\s/.test(k)}
 function blobB64(b){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result).split(',')[1]||'')};r.onerror=function(){rej({code:'image_rejected'})};r.readAsDataURL(b)})}
 async function gCall(body,signal){
   var cfg=gCfg(); if(!gKeyOk(cfg.key)) throw {code:'bad_key'};
@@ -569,7 +569,7 @@ function cfgHTML(){
 async function cfgSave(){
   var cfg=gCfg(),k=($('#cfg-key')||{value:''}).value.replace(/\s+/g,''),m=($('#cfg-model')||{value:''}).value;
   if(k){
-    if(!gKeyOk(k)){ toast('A chave tem caracteres inválidos. Copie de novo em aistudio.google.com/apikey.'); return; }
+    if(!gKeyOk(k)){ toast('Cole uma chave sem espaços. Use o botão de copiar no AI Studio.'); return; }
     cfg.key=k;
   }
   if(!gKeyOk(cfg.key)){ toast('Cole a chave da API do Gemini para continuar.'); return; }
