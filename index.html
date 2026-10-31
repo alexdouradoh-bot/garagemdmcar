@@ -1,5 +1,5 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Www.DMgaragemcar.com.br</title>
+<!doctype html><html lang="pt-BR" data-theme="dark"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>DM Garagem Car | Minha coleção</title><meta name="theme-color" content="#101114">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <style>
 /* Layout: pegboard grid of collector cards; the orange track line runs along the tab bar; toy codes are set in mono like the print on a blister card. */
@@ -143,14 +143,72 @@ input.missing{border-style:dashed;border-color:var(--warn)}
 .file{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0)}
 </style>
 
+
+<style id="garage-orange-theme">
+:root,:root[data-theme="dark"]{color-scheme:dark;--bg:#101114;--surface:#1a1c21;--surface-2:#24272e;--ink:#f5f5f7;--ink-2:#b0b4bf;--line:#343740;--accent:#ff842e;--accent-ink:#211005;--link:#ffb67c;--ok:#76deb0;--warn:#ffd18a;--bad:#ff9a93;--r:16px;--nav-h:68px}
+body{background:radial-gradient(ellipse at 90% 0%,#3a251a66,transparent 45%),var(--bg);max-width:1180px;margin:0 auto;padding-inline:20px}
+.top{padding-block:20px 18px;background:#101114ed;backdrop-filter:blur(16px);flex-wrap:wrap;border-bottom:1px solid #ffffff0b;margin-bottom:20px}
+.brand{display:flex;align-items:center;gap:10px;font-size:29px;letter-spacing:.025em}
+.brand-mark{display:grid;place-items:center;width:49px;height:49px;background:linear-gradient(145deg,#ffad59,#ff7722);color:#211005;border-radius:14px;font-size:28px;box-shadow:0 5px 22px #ff842e22;transform:skew(-5deg)}
+.brand small{font:400 12px var(--f-body);color:var(--ink-2);letter-spacing:.01em;margin-top:5px}
+.count{padding:9px 12px;border-color:var(--line);font-size:11px;background:var(--surface)}
+#cfg-btn{min-height:42px;color:var(--accent);border-color:#ff842e55}
+.garage-intro{position:relative;overflow:hidden;padding:26px 24px;margin-bottom:28px;border:1px solid #ff842e44;border-radius:22px;background:radial-gradient(ellipse at 100% 20%,#ff842e29,transparent 65%),linear-gradient(130deg,#26201c,#18191e)}
+.eyebrow{font:600 10px var(--f-mono);letter-spacing:.16em;color:#ffb67c}
+.garage-intro h2{font:700 clamp(34px,6vw,54px)/1.04 var(--f-display);text-transform:uppercase;margin:14px 0 12px;letter-spacing:.01em}
+.garage-intro h2 span{color:var(--accent)}
+.garage-intro p{font-size:14px;color:var(--ink-2);margin-bottom:20px}
+.garage-intro .btn{font-size:14px;min-height:46px}
+.collection-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.collection-heading h2{font:700 26px var(--f-display);text-transform:uppercase}
+.collection-heading span{font-size:12px;color:var(--ink-2)}
+input,select,textarea{background:#1b1d23;border-color:#373a44;padding:14px;min-height:48px}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+#q{padding-left:17px;border-radius:14px;box-shadow:0 4px 18px #00000015}
+.chips{padding-block:14px 8px;gap:8px}
+.chip{min-height:40px;padding:9px 14px;font-size:13px}
+.chip[aria-pressed="true"]{background:#ff842e20;border-color:#ff842e88;color:#ffb67c}
+.grid{gap:14px;margin-top:12px}
+.card{border-radius:18px;box-shadow:0 8px 24px #00000020;transition:transform .18s,border-color .18s}
+.card .meta{padding:14px 12px;gap:7px}
+.card h3{font-size:22px;line-height:1.1}
+.card .sub{font-size:12px;line-height:1.5}
+.ph{aspect-ratio:1/1;background:linear-gradient(135deg,#292c33,#1b1d22)}
+.tag{font-size:10px;padding:4px 7px;border-radius:6px;line-height:1.5}
+.tag.rare{background:#ff842e22;border:1px solid #ff842e55;color:#ffb67c}
+.btn{border-radius:13px;min-height:48px;transition:background .18s,transform .18s}
+.btn.primary{background:linear-gradient(120deg,#ff9d48,#ff7b22);border-color:#ff9c4f;box-shadow:0 5px 18px #ff842e18;font-weight:600}
+.btn:active,.card:active{transform:scale(.98)}
+.backup{margin-top:32px;padding:22px 18px;background:var(--surface);border:1px solid var(--line);border-radius:20px}
+.links-h{color:#ffb67c;letter-spacing:.12em;margin-top:8px}
+.note{background:#24262d;border:1px solid #363943;border-radius:14px;line-height:1.6}
+.capture{padding:30px 18px;border-radius:20px;background:linear-gradient(135deg,#26211d,#1a1c21);gap:10px}
+.capture.primary{border-color:#ff842e88}
+.form{gap:16px 12px}.lbl{gap:8px;font-size:11px;line-height:1.5}
+.sheet{background:#101114}.sheet-bar{background:#101114f5;margin-bottom:14px}
+.sheet>.stack,.sheet>.sheet-bar{max-width:860px;margin-inline:auto}
+.shots img{border-radius:18px}.nums div{padding:16px}.car-name{font-size:40px}
+.bubble{padding:14px 16px;line-height:1.6}.bubble.user{background:#ff963f;color:#211005}
+.tabs{background:#191b20f5;backdrop-filter:blur(18px);border-top:1px solid #373a44;box-shadow:0 -8px 30px #00000035}
+.tabs::before{display:none}.tab{position:relative;font-size:10px;letter-spacing:.05em;gap:6px}
+.tab[aria-selected="true"]{color:#ffae70;background:linear-gradient(180deg,#ff842e14,transparent)}
+.tab[aria-selected="true"]::before{content:"";position:absolute;top:0;width:36px;height:3px;background:var(--accent);border-radius:0 0 5px 5px}
+.toast{background:#2b2d34;color:#fff;border:1px solid #ff842e66;box-shadow:0 10px 35px #0008;line-height:1.5}
+.empty{padding:30px 20px;background:var(--surface);border:1px dashed var(--line);border-radius:20px}.empty svg{color:var(--accent)}
+@media(hover:hover){.card:hover{transform:translateY(-4px);border-color:#ff842e88}.btn:hover:not(:disabled){border-color:var(--accent)}}
+@media(min-width:900px){.grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}.garage-intro{padding:36px}.top{padding-block:24px}.tab{font-size:12px}.sheet{padding-inline:max(24px,calc((100vw - 860px)/2))}}
+@media(max-width:380px){body{padding-inline:14px}.brand{font-size:25px}.brand-mark{width:42px;height:42px}.collection-heading span{font-size:10px}.garage-intro{padding:22px 18px}.card h3{font-size:20px}}
+@media(prefers-reduced-motion:reduce){.btn,.card{transition:none}.card:hover,.card:active,.btn:active{transform:none}}
+</style>
+
 <header class="top">
-  <h1 class="brand">DM coleção<small>Www.DMgaragemcar.com.br</small></h1>
+  <h1 class="brand"><span class="brand-mark" aria-hidden="true">DM</span><span>Garagem Car<small>Sua coleção em um só lugar</small></span></h1>
   <div style="display:flex;gap:8px;align-items:center"><button class="count" id="cfg-btn" data-act="cfg" aria-label="Configurar a IA" style="background:none;cursor:pointer">⚙ IA</button><span class="count" id="count">0 carrinhos</span></div>
 </header>
 
 <main>
   <section id="v-col" aria-label="Coleção">
-    <input id="q" type="search" placeholder="Buscar por nome, série ou código" autocomplete="off" aria-label="Buscar na coleção">
+    <div class="garage-intro"><span class="eyebrow">GARAGEM • ESCALA 1:64</span><h2>Pequenos carros.<br><span>Grandes histórias.</span></h2><p>Sua coleção merece um lugar de destaque.</p><button class="btn primary" data-act="tab" data-tab="add">+ Adicionar carrinho</button></div><div class="collection-heading"><h2>Minha coleção</h2><span>Explore sua garagem</span></div><input id="q" type="search" placeholder="Buscar por nome, série ou código" autocomplete="off" aria-label="Buscar na coleção">
     <div class="chips" id="chips"></div>
     <div id="grid-wrap"></div>
     <div class="backup stack" id="backup"></div>
